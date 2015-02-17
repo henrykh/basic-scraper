@@ -117,7 +117,6 @@ def extract_score_data(listing):
     return data
 
 
-
 if __name__ == "__main__":
     kwargs = {
         'Inspection_Start': '2/1/2013',
@@ -134,4 +133,14 @@ if __name__ == "__main__":
         metadata = extract_restaurant_metadata(listing)
         score_data = extract_score_data(listing)
         metadata["Score Data"] = score_data
-        print metadata
+
+        print "{}: {}\n".format("Business Name", " ".join(metadata["Business Name"]))
+        print "{}: {}\n".format("Address", " ".join(metadata["Address"]))
+        print "{}: {}\n".format("Longitude", " ".join(metadata["Longitude"]))
+        print "{}: {}\n".format("Latitude", " ".join(metadata["Latitude"]))
+        print "{}: {}\n".format("Phone", " ".join(metadata["Phone"]))
+        print "{}: {}\n".format("Business Category", " ".join(metadata["Business Category"]))
+        scores = ["{}: {}".format(key, value) for key, value in metadata["Score Data"].items()]
+        print "{}: {}\n".format("Score Data", ", ".join(scores))
+
+        print "\n"
