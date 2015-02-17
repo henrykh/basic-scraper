@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import sys
+import re
 
 INSPECTION_DOMAIN = 'http://info.kingcounty.gov/'
 INSPECTION_PATH = '/health/ehs/foodsafety/inspections/Results.aspx'
@@ -32,18 +33,54 @@ def get_inspection_page(**kwargs):
             params[key] = value
     response = requests.get(url, params=params)
     response.raise_for_status()
+    print response.encoding
     with open("inspection_page.html", 'w') as f:
+        f.write("{}\n".format(response.encoding))
         f.write(response.content)
     return response.content, response.encoding
 
 
 def load_inspection_page():
     with open("inspection_page.html", 'r') as f:
-        return f.read()
+        encoding = f.readline()
+        content = f.read()
+        return content, encoding
 
 
 def parse_source(html, encoding="utf-8"):
     return BeautifulSoup(html, from_encoding=encoding)
+
+
+def extract_data_listings(parsed_doc):
+    container_finder = re.compile(r'PR[\d]+~')
+    return parsed_doc.find_all('div', id=container_finder)
+
+
+def has_two_tds(element):
+    td_children = element.find_all('td', recursive=False)
+    return element.name == 'tr' and len(td_children) == 2
+
+
+def clean_data(td):
+    data = td.string
+    try:
+        return data.strip(" \n:-")
+    except AttributeError:
+        return u""
+
+
+def extract_restaurant_metadata(listing):
+    metadata_rows = listing.find('tbody').find_all(
+        has_two_tds, recursive=False)
+    restaurant_data = {}
+    current_label = ''
+    for row in metadata_rows:
+        key_cell, val_cell = row.find_all('td', recursive=False)
+        new_label = clean_data(key_cell)
+        current_label = new_label if new_label else current_label
+        restaurant_data.setdefault(current_label, []).append(
+            clean_data(val_cell))
+    return restaurant_data
 
 if __name__ == "__main__":
     kwargs = {
@@ -51,9 +88,11 @@ if __name__ == "__main__":
         'Inspection_End': '2/1/2015',
         'Zip_Code': '98109'
     }
-    if sys.argv[1] and sys.argv[1] == 'test':
+    if len(sys.argv) > 1 and sys.argv[1] == 'test':
         html, encoding = load_inspection_page()
     else:
         html, encoding = get_inspection_page(**kwargs)
     doc = parse_source(html, encoding)
-    print doc.prettify(encoding=encoding)
+    listings = extract_data_listings(doc)
+    for listing in listings[:5]:
+       metadata = extract_restaurant_metadata(listing)
