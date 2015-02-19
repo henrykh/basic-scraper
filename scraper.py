@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import sys
 import re
+import geocoder
 
 INSPECTION_DOMAIN = 'http://info.kingcounty.gov/'
 INSPECTION_PATH = '/health/ehs/foodsafety/inspections/Results.aspx'
@@ -117,13 +118,13 @@ def extract_score_data(listing):
     return data
 
 
-if __name__ == "__main__":
+def generate_results(test=False):
     kwargs = {
         'Inspection_Start': '2/1/2013',
         'Inspection_End': '2/1/2015',
         'Zip_Code': '98109'
     }
-    if len(sys.argv) > 1 and sys.argv[1] == 'test':
+    if test:
         html, encoding = load_inspection_page()
     else:
         html, encoding = get_inspection_page(**kwargs)
@@ -132,15 +133,20 @@ if __name__ == "__main__":
     for listing in listings:
         metadata = extract_restaurant_metadata(listing)
         score_data = extract_score_data(listing)
-        metadata["Score Data"] = score_data
+        metadata.update(score_data)
+        yield metadata
 
-        print "{}: {}\n".format("Business Name", " ".join(metadata["Business Name"]))
-        print "{}: {}\n".format("Address", " ".join(metadata["Address"]))
-        print "{}: {}\n".format("Longitude", " ".join(metadata["Longitude"]))
-        print "{}: {}\n".format("Latitude", " ".join(metadata["Latitude"]))
-        print "{}: {}\n".format("Phone", " ".join(metadata["Phone"]))
-        print "{}: {}\n".format("Business Category", " ".join(metadata["Business Category"]))
-        scores = ["{}: {}".format(key, value) for key, value in metadata["Score Data"].items()]
-        print "{}: {}\n".format("Score Data", ", ".join(scores))
 
-        print "\n"
+def get_geojson(result):
+    address = " ".join(result.get('Address', ''))
+    if not address:
+        return None
+    geocoded = geocoder.google(address)
+    return geocoded.geojson
+
+if __name__ == "__main__":
+    import pprint
+    test = len(sys.argv) > 1 and sys.argv[1] == 'test'
+    for result in generate_results(test):
+        geo_result = get_geojson(result)
+        pprint.pprint(geo_result)
