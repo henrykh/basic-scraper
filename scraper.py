@@ -122,7 +122,7 @@ def extract_score_data(listing):
     return data
 
 
-def generate_results(sorter=None, count=10,):
+def generate_results(sorter, count, reverse):
     kwargs = {
         'Inspection_Start': '2/1/2013',
         'Inspection_End': '2/1/2015',
@@ -134,6 +134,7 @@ def generate_results(sorter=None, count=10,):
         html, encoding = get_inspection_page(**kwargs)
     doc = parse_source(html, encoding)
     listings = extract_data_listings(doc)
+
     total_metadata = []
     for listing in listings:
         metadata = extract_restaurant_metadata(listing)
@@ -144,7 +145,8 @@ def generate_results(sorter=None, count=10,):
     if sorter:
         sorter = string.capwords(sorter.replace("_", " "))
 
-    total_metadata = sorted(total_metadata, key=itemgetter(sorter), reverse = True)
+        total_metadata = sorted(
+            total_metadata, key=itemgetter(sorter), reverse=not bool(reverse))
 
     for listing in total_metadata[:count]:
         yield listing
@@ -177,11 +179,14 @@ def get_geojson(result):
 if __name__ == "__main__":
     import pprint
     parser = argparse.ArgumentParser("Score Sorting")
-    parser.add_argument('--sort', choices=("high_score", "average_score", "total_inspections"))
+    parser.add_argument('sort', nargs='?', default=None, choices=(
+        "high_score", "average_score", "total_inspections"))
+    parser.add_argument('count', nargs='?', default=10, type=int)
+    parser.add_argument('reverse', nargs='?', default=False)
     args = parser.parse_args()
     # test = len(sys.argv) > 1 and sys.argv[1] == 'test'
     total_result = {'type': 'FeatureCollection', 'features': []}
-    for result in generate_results(args.sort):
+    for result in generate_results(args.sort, args.count, args.reverse):
         geo_result = get_geojson(result)
         pprint.pprint(geo_result)
         total_result['features'].append(geo_result)
